@@ -9,8 +9,8 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { CreateEventDto } from 'src/create-event/create-event.dto';
-import { UpdateEventDto } from 'src/update-event.dto/update-event.dto';
+import { CreateEventDto } from 'src/dtos/create-event/create-event.dto';
+import { UpdateEventDto } from 'src/dtos/update-event/update-event.dto';
 import { Event } from '../entities/event.entity';
 
 @Controller('events')
