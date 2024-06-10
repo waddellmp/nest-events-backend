@@ -6,73 +6,81 @@ import {
   HttpCode,
   NotFoundException,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
 } from '@nestjs/common';
-import { CreateEventDto } from 'src/dtos/create-event/create-event.dto';
-import { UpdateEventDto } from 'src/dtos/update-event/update-event.dto';
-import { Event } from '../entities/event.entity';
+import { CreateEventDto } from 'src/events/create-event.dto';
+import { UpdateEventDto } from 'src/events/update-event.dto';
+import { Event } from '../events/event.entity';
+import { Like, MoreThan, type Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Controller('events')
 export class EventsController {
-  private events: Event[] = [
-    {
-      id: 1,
-      name: 'Event 1',
-      description: 'Description 1',
-      when: new Date('2021-10-10'),
-      address: 'Address 1',
-    },
-    {
-      id: 2,
-      name: 'Event 2',
-      description: 'Description 2',
-      when: new Date('2021-10-10'),
-      address: 'Address 2',
-    },
-  ];
+  constructor(
+    @InjectRepository(Event)
+    private readonly repository: Repository<Event>,
+  ) {}
 
   @Get()
-  findAll(): Event[] {
-    return this.events;
+  async findAll() {
+    return await this.repository.find();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.events.find((event) => {
-      return event.id === parseInt(id);
+  @Get('/practice')
+  async practice() {
+    return await this.repository.find({
+      select: ['id', 'when'],
+      take: 2,
+      order: {
+        id: 'DESC',
+      },
+      where: [
+        {
+          id: MoreThan(3),
+          when: MoreThan(new Date('2021-02-12T13:00:00')),
+        },
+        {
+          description: Like('%meet%'),
+        },
+      ],
     });
   }
 
+  @Get(':id')
+  async findOne(@Param('id', ParseIntPipe) id) {
+    return await this.repository.findOneById(id);
+  }
+
   @Post()
-  create(@Body() input: CreateEventDto): Event {
-    const event = {
+  async create(@Body() input: CreateEventDto) {
+    return await this.repository.save({
       ...input,
       when: new Date(input.when),
-      id: this.events.length + 1,
-    };
-    this.events.push(event);
-    return event;
+    });
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() input: UpdateEventDto) {
-    const index = this.events.findIndex((event) => event.id === parseInt(id));
-    if (index === -1) {
-      throw new NotFoundException();
-    }
-    this.events[index] = {
-      ...this.events[index],
-      ...input,
-      when: input.when ? new Date(input.when) : this.events[index].when,
-    };
+  async update(@Param('id') id: string, @Body() input: UpdateEventDto) {
+    // Find event by id
+    const event = await this.repository.findOneById(id);
 
-    return this.events[index];
+    //  If event not found, throw an exception
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    return await this.repository.update(id, {
+      ...event,
+      ...input,
+      when: input.when ? new Date(input.when) : event.when,
+    });
   }
 
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id') id: string) {
-    this.events = this.events.filter((event) => event.id !== parseInt(id));
+  async remove(@Param('id') id: string) {
+    return this.repository.delete(id);
   }
 }
